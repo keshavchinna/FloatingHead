@@ -1,16 +1,19 @@
 package com.daya.floatinghead.Service;
 
+import android.Manifest;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.graphics.PixelFormat;
 import android.os.IBinder;
-import android.preference.PreferenceManager;
+import android.provider.CallLog;
+import android.support.v4.app.ActivityCompat;
+import android.util.Log;
 import android.view.Display;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -24,7 +27,6 @@ import android.widget.PopupWindow;
 
 import com.daya.floatinghead.Adapter.CustomAdapter;
 import com.daya.floatinghead.Manager.PInfo;
-import com.daya.floatinghead.Manager.RetrievePackages;
 import com.daya.floatinghead.R;
 
 import java.util.ArrayList;
@@ -44,7 +46,7 @@ public class FloatingHeadService extends Service {
 
   ArrayList<String> myArray;
   ArrayList<PInfo> apps;
-  List listCity;
+  List callLogList;
   private ListPopupWindow popup;
 
   @Override
@@ -56,28 +58,12 @@ public class FloatingHeadService extends Service {
   @Override
   public void onCreate() {
     super.onCreate();
-
-    SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
-
-    RetrievePackages getInstalledPackages = new RetrievePackages(getApplicationContext());
-    apps = getInstalledPackages.getInstalledApps(false);
-    myArray = new ArrayList<String>();
-
-    for (int i = 0; i < apps.size(); ++i) {
-      myArray.add(apps.get(i).appname);
-    }
-
-    listCity = new ArrayList();
-    for (int i = 0; i < apps.size(); ++i) {
-      listCity.add(apps.get(i));
-    }
-
     windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-
     chatHead = new ImageView(this);
-
+    Log.d("Call Logs: ", "beforeGetCallDetails: " + callLogList);
+    getCallDetails();
+    Log.d("Call Logs: ", "afterGetCallDetails: " + callLogList);
     chatHead.setImageResource(R.drawable.face1);
-
     final WindowManager.LayoutParams params = new WindowManager.LayoutParams(
         WindowManager.LayoutParams.WRAP_CONTENT,
         WindowManager.LayoutParams.WRAP_CONTENT,
@@ -88,9 +74,7 @@ public class FloatingHeadService extends Service {
     params.gravity = Gravity.TOP | Gravity.LEFT;
     params.x = 0;
     params.y = 100;
-
     windowManager.addView(chatHead, params);
-
     try {
       chatHead.setOnTouchListener(new View.OnTouchListener() {
         private WindowManager.LayoutParams paramsF = params;
@@ -146,7 +130,7 @@ public class FloatingHeadService extends Service {
       popup.setWidth((int) (display.getWidth() / (1.5)));
       //ArrayAdapter<String> arrayAdapter =
       //new ArrayAdapter<String>(this,R.layout.list_item, myArray);
-      popup.setAdapter(new CustomAdapter(getApplicationContext(), R.layout.row, listCity));
+      popup.setAdapter(new CustomAdapter(getApplicationContext(), R.layout.row, callLogList));
       popup.setOnItemClickListener(new OnItemClickListener() {
 
         @Override
@@ -189,6 +173,28 @@ public class FloatingHeadService extends Service {
   public void onDestroy() {
     super.onDestroy();
     if (chatHead != null) windowManager.removeView(chatHead);
+  }
+
+  void getCallDetails() {
+    if (ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED) {
+      // TODO: Consider calling
+      //    ActivityCompat#requestPermissions
+      // here to request the missing permissions, and then overriding
+      //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+      //                                          int[] grantResults)
+      // to handle the case where the user grants the permission. See the documentation
+      // for ActivityCompat#requestPermissions for more details.
+    }
+    Cursor managedCursor = getApplicationContext().getContentResolver().query(CallLog.Calls.CONTENT_URI, null, null, null, null);
+    int number = managedCursor.getColumnIndex(CallLog.Calls.NUMBER);
+    int type = managedCursor.getColumnIndex(CallLog.Calls.TYPE);
+    int date = managedCursor.getColumnIndex(CallLog.Calls.DATE);
+    int duration = managedCursor.getColumnIndex(CallLog.Calls.DURATION);
+    callLogList = new ArrayList();
+    while (managedCursor.moveToNext()) {
+      Log.d("Call Logs:", "phoneNumber: " + managedCursor.getString(number));
+      callLogList.add(managedCursor.getString(number));
+    }
   }
 
 }
